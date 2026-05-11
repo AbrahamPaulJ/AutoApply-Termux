@@ -1,15 +1,10 @@
-# Sensitive
 Users/
 *.session
 gemini.py
-
-# Generated
 *.log
 job_ids.txt
 debug_form.html
 __pycache__/
 *.pyc
-
-# jsoncv build output
 jsoncv/dist/
 jsoncv/node_modules/
