@@ -1,0 +1,12 @@
+# Python packages (install via pip)
+selenium
+pyyaml
+requests
+
+# Termux packages (install via pkg)
+# pkg install x11-repo
+# pkg install firefox geckodriver chromium termux-x11-nightly
+# pkg install python git openssh nodejs termux-api
+
+# jsoncv (install via npm inside jsoncv/ folder)
+# cd jsoncv && npm install
