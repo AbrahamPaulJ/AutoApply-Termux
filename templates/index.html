@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>AutoApply</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0c0f;
+    --surface:  #111318;
+    --border:   #1e2229;
+    --border2:  #2a2f3a;
+    --text:     #c8d0dc;
+    --muted:    #4a5568;
+    --accent:   #00e5a0;
+    --accent2:  #0077ff;
+    --warn:     #ff6b35;
+    --danger:   #ff3b5c;
+    --success:  #00e5a0;
+    --glow:     0 0 20px rgba(0,229,160,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 24px 16px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .logo-text {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 22px;
+    color: #fff;
+    letter-spacing: -0.5px;
+  }
+
+  .logo-text span {
+    color: var(--accent);
+  }
+
+  .logo-sub {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border2);
+    background: var(--surface);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    transition: all 0.3s;
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: all 0.3s;
+  }
+
+  .status-pill.running {
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: var(--glow);
+  }
+
+  .status-pill.running .status-dot {
+    background: var(--accent);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Section */
+  .section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .section:hover { border-color: var(--border2); }
+
+  .section-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .section-body {
+    padding: 18px;
+  }
+
+  /* Toggles grid */
+  .toggles-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .toggle-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .toggle-item:hover { border-color: var(--border2); }
+
+  .toggle-item.active {
+    border-color: var(--accent);
+    background: rgba(0, 229, 160, 0.04);
+  }
+
+  .toggle-item.danger.active {
+    border-color: var(--danger);
+    background: rgba(255, 59, 92, 0.05);
+  }
+
+  .toggle-item.warn.active {
+    border-color: var(--warn);
+    background: rgba(255, 107, 53, 0.05);
+  }
+
+  .toggle-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .toggle-name {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .toggle-flag {
+    font-size: 10px;
+    color: var(--muted);
+  }
+
+  .toggle-switch {
+    width: 32px;
+    height: 18px;
+    background: var(--border2);
+    border-radius: 9px;
+    position: relative;
+    transition: all 0.25s;
+    flex-shrink: 0;
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--muted);
+    top: 3px;
+    left: 3px;
+    transition: all 0.25s;
+  }
+
+  .toggle-item.active .toggle-switch {
+    background: rgba(0, 229, 160, 0.3);
+  }
+
+  .toggle-item.active .toggle-switch::after {
+    background: var(--accent);
+    left: 17px;
+    box-shadow: 0 0 8px rgba(0, 229, 160, 0.6);
+  }
+
+  .toggle-item.danger.active .toggle-switch {
+    background: rgba(255, 59, 92, 0.3);
+  }
+
+  .toggle-item.danger.active .toggle-switch::after {
+    background: var(--danger);
+    left: 17px;
+    box-shadow: 0 0 8px rgba(255, 59, 92, 0.6);
+  }
+
+  .toggle-item.warn.active .toggle-switch {
+    background: rgba(255, 107, 53, 0.3);
+  }
+
+  .toggle-item.warn.active .toggle-switch::after {
+    background: var(--warn);
+    left: 17px;
+    box-shadow: 0 0 8px rgba(255, 107, 53, 0.6);
+  }
+
+  /* Inputs */
+  .inputs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .input-group.full { grid-column: 1 / -1; }
+
+  .input-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .input-wrap {
+    position: relative;
+  }
+
+  .input-flag {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--accent2);
+    pointer-events: none;
+  }
+
+  input[type="text"],
+  input[type="number"] {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 10px 10px 72px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input[type="number"] { padding-left: 10px; }
+
+  input:focus { border-color: var(--accent2); }
+  input::placeholder { color: var(--muted); }
+
+  /* Command preview */
+  .cmd-preview {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 11px;
+    color: var(--muted);
+    word-break: break-all;
+    line-height: 1.6;
+    min-height: 42px;
+  }
+
+  .cmd-preview .cmd-base { color: var(--accent2); }
+  .cmd-preview .cmd-flag { color: var(--accent); }
+  .cmd-preview .cmd-val  { color: var(--text); }
+
+  /* Action buttons */
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.06);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .btn:hover::after { opacity: 1; }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-run {
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(0, 229, 160, 0.25);
+  }
+
+  .btn-run:hover { box-shadow: 0 4px 30px rgba(0, 229, 160, 0.4); }
+
+  .btn-stop {
+    background: var(--surface);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    flex: 0 0 auto;
+    padding: 14px 20px;
+  }
+
+  .btn-stop:hover { background: rgba(255, 59, 92, 0.08); }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* Log terminal */
+  .log-terminal {
+    background: #070809;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .log-titlebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .log-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .log-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
+  .log-dot.red    { background: #ff5f57; }
+  .log-dot.yellow { background: #ffbd2e; }
+  .log-dot.green  { background: #28c840; }
+
+  .log-title {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .log-clear {
+    font-size: 10px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: none;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    transition: all 0.2s;
+  }
+
+  .log-clear:hover { border-color: var(--border2); color: var(--text); }
+
+  #log-output {
+    height: 280px;
+    overflow-y: auto;
+    padding: 14px;
+    font-size: 11px;
+    line-height: 1.7;
+    scroll-behavior: smooth;
+  }
+
+  #log-output::-webkit-scrollbar { width: 4px; }
+  #log-output::-webkit-scrollbar-track { background: transparent; }
+  #log-output::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-line { display: block; word-break: break-all; }
+  .log-line.info    { color: #7ec8e3; }
+  .log-line.success { color: var(--accent); }
+  .log-line.error   { color: var(--danger); }
+  .log-line.warn    { color: var(--warn); }
+  .log-line.muted   { color: var(--muted); }
+  .log-line.default { color: #8a9bb0; }
+
+  .log-cursor {
+    display: inline-block;
+    width: 7px;
+    height: 13px;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+  }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+  /* Animations */
+  .section {
+    animation: fadeUp 0.4s ease both;
+  }
+
+  .section:nth-child(1) { animation-delay: 0.05s; }
+  .section:nth-child(2) { animation-delay: 0.1s; }
+  .section:nth-child(3) { animation-delay: 0.15s; }
+  .section:nth-child(4) { animation-delay: 0.2s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .header { animation: fadeUp 0.4s ease both; }
+
+  /* Timeframe widget */
+  .timeframe-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tf-units {
+    display: flex;
+    gap: 8px;
+  }
+
+  .tf-unit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--muted);
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .tf-unit input[type="radio"] { display: none; }
+
+  .tf-unit.active {
+    border-color: var(--accent2);
+    color: var(--accent2);
+    background: rgba(0,119,255,0.06);
+  }
+
+  .tf-range-wrap { display: flex; flex-direction: column; gap: 6px; }
+
+  .tf-range-labels {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+  }
+
+  .tf-range-labels span:first-child,
+  .tf-range-labels span:last-child {
+    color: var(--accent);
+    font-weight: 500;
+    min-width: 24px;
+  }
+
+  #tf-range-desc {
+    color: var(--muted);
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .tf-sliders { display: flex; flex-direction: column; gap: 6px; }
+
+  .tf-sliders input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--border2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .tf-sliders input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px rgba(0,229,160,0.5);
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div>
+        <div class="logo-text">Auto<span>Apply</span></div>
+        <div class="logo-sub">Seek · Control Panel</div>
+      </div>
+    </div>
+    <div class="status-pill" id="status-pill">
+      <div class="status-dot"></div>
+      <span id="status-text">IDLE</span>
+    </div>
+  </div>
+
+  <!-- Toggles -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Flags</div>
+    </div>
+    <div class="section-body">
+      <div class="toggles-grid">
+
+        <div class="toggle-item warn" id="toggle-submit" onclick="toggleFlag('submit', this)">
+          <div class="toggle-label">
+            <span class="toggle-name">Submit</span>
+            <span class="toggle-flag">--submit</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+
+        <div class="toggle-item" id="toggle-force_apply" onclick="toggleFlag('force_apply', this)">
+          <div class="toggle-label">
+            <span class="toggle-name">Force Apply</span>
+            <span class="toggle-flag">--force-apply</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+
+        <div class="toggle-item" id="toggle-no_gemini" onclick="toggleFlag('no_gemini', this)">
+          <div class="toggle-label">
+            <span class="toggle-name">No Gemini</span>
+            <span class="toggle-flag">--no-gemini</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+
+        <div class="toggle-item danger" id="toggle-clear_ids" onclick="toggleFlag('clear_ids', this)">
+          <div class="toggle-label">
+            <span class="toggle-name">Clear IDs</span>
+            <span class="toggle-flag">--clear-ids</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+
+        <div class="toggle-item" id="toggle-debug_form" onclick="toggleFlag('debug_form', this)">
+          <div class="toggle-label">
+            <span class="toggle-name">Debug Form</span>
+            <span class="toggle-flag">--debug-form</span>
+          </div>
+          <div class="toggle-switch"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Inputs -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Parameters</div>
+    </div>
+    <div class="section-body">
+      <div class="inputs-grid">
+
+        <div class="input-group">
+          <div class="input-label">Limit</div>
+          <input type="number" id="input-limit" value="2" placeholder="no limit" min="1">
+        </div>
+
+        <div class="input-group">
+          <div class="input-label">User</div>
+          <div class="input-wrap">
+            <span class="input-flag">--user</span>
+            <input type="text" id="input-user" value="abraham" placeholder="abraham">
+          </div>
+        </div>
+
+        <div class="input-group full">
+          <div class="input-label">Timeframe</div>
+          <div class="timeframe-box">
+            <div class="tf-units">
+              <label class="tf-unit active"><input type="radio" name="tf-unit" value="m" checked> min</label>
+              <label class="tf-unit"><input type="radio" name="tf-unit" value="h"> hour</label>
+              <label class="tf-unit"><input type="radio" name="tf-unit" value="d"> day</label>
+            </div>
+            <div class="tf-range-wrap">
+              <div class="tf-range-labels">
+                <span id="tf-min-val">1</span>
+                <span id="tf-range-desc">posted 1 – 60 min ago</span>
+                <span id="tf-max-val">60</span>
+              </div>
+              <div class="tf-sliders">
+                <input type="range" id="tf-min" min="1" max="60" value="1">
+                <input type="range" id="tf-max" min="1" max="60" value="60">
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Command preview -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Command Preview</div>
+    </div>
+    <div class="section-body">
+      <div class="cmd-preview" id="cmd-preview"></div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions" style="margin-bottom:16px;">
+    <button class="btn btn-run" id="btn-run" onclick="runScraper()">▶ Run Scraper</button>
+    <button class="btn btn-stop" id="btn-stop" onclick="stopScraper()" disabled>■ Stop</button>
+  </div>
+
+  <!-- Log terminal -->
+  <div class="log-terminal">
+    <div class="log-titlebar">
+      <div class="log-dots">
+        <div class="log-dot red"></div>
+        <div class="log-dot yellow"></div>
+        <div class="log-dot green"></div>
+      </div>
+      <div class="log-title">scraper.log</div>
+      <div style="display:flex;gap:6px;">
+        <button class="log-clear" onclick="copyLog()">copy</button>
+        <button class="log-clear" onclick="clearLog()">clear</button>
+      </div>
+    </div>
+    <div id="log-output">
+      <span class="log-line muted">$ waiting for scraper...<span class="log-cursor"></span></span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const flags = { submit: false, force_apply: false, no_gemini: false, clear_ids: false, debug_form: false };
+  let isRunning = false;
+  let eventSource = null;
+
+  const TF_MAX = { m: 120, h: 48, d: 14 };
+  const TF_LABEL = { m: 'min', h: 'hour', d: 'day' };
+
+  function getTfUnit() {
+    return document.querySelector('input[name="tf-unit"]:checked').value;
+  }
+
+  function buildTimeframeRegex() {
+    const unit = getTfUnit();
+    const min  = parseInt(document.getElementById('tf-min').value);
+    const max  = parseInt(document.getElementById('tf-max').value);
+    const nums = [];
+    for (let i = min; i <= max; i++) nums.push(i);
+    return `^(${nums.join('|')})${unit} ago$`;
+  }
+
+  function updateTfDesc() {
+    const unit  = getTfUnit();
+    const label = TF_LABEL[unit];
+    const min   = parseInt(document.getElementById('tf-min').value);
+    const max   = parseInt(document.getElementById('tf-max').value);
+    document.getElementById('tf-min-val').textContent = min;
+    document.getElementById('tf-max-val').textContent = max;
+    document.getElementById('tf-range-desc').textContent =
+      min === max ? `posted ${min} ${label} ago` : `posted ${min} – ${max} ${label} ago`;
+    updatePreview();
+  }
+
+  function setTfUnit(unit) {
+    document.querySelectorAll('.tf-unit').forEach(el => el.classList.remove('active'));
+    document.querySelector(`.tf-unit input[value="${unit}"]`).closest('.tf-unit').classList.add('active');
+    const mx = TF_MAX[unit];
+    const minEl = document.getElementById('tf-min');
+    const maxEl = document.getElementById('tf-max');
+    minEl.max = mx; maxEl.max = mx;
+    minEl.value = 1; maxEl.value = mx;
+    updateTfDesc();
+  }
+
+  document.querySelectorAll('input[name="tf-unit"]').forEach(r => {
+    r.addEventListener('change', () => setTfUnit(r.value));
+  });
+  document.querySelectorAll('.tf-unit').forEach(el => {
+    el.addEventListener('click', () => {
+      const r = el.querySelector('input[type="radio"]');
+      r.checked = true; setTfUnit(r.value);
+    });
+  });
+
+  document.getElementById('tf-min').addEventListener('input', function() {
+    const maxEl = document.getElementById('tf-max');
+    if (parseInt(this.value) > parseInt(maxEl.value)) maxEl.value = this.value;
+    updateTfDesc();
+  });
+  document.getElementById('tf-max').addEventListener('input', function() {
+    const minEl = document.getElementById('tf-min');
+    if (parseInt(this.value) < parseInt(minEl.value)) minEl.value = this.value;
+    updateTfDesc();
+  });
+
+  function toggleFlag(key, el) {
+    if (isRunning) return;
+    flags[key] = !flags[key];
+    el.classList.toggle('active', flags[key]);
+    updatePreview();
+  }
+
+  function updatePreview() {
+    const limit     = document.getElementById('input-limit').value;
+    const user      = document.getElementById('input-user').value;
+    const timeframe = buildTimeframeRegex();
+
+    let parts = ['<span class="cmd-base">python mvp_scraper.py</span>'];
+    if (flags.submit)      parts.push('<span class="cmd-flag">--submit</span>');
+    if (flags.force_apply) parts.push('<span class="cmd-flag">--force-apply</span>');
+    if (flags.no_gemini)   parts.push('<span class="cmd-flag">--no-gemini</span>');
+    if (flags.clear_ids)   parts.push('<span class="cmd-flag">--clear-ids</span>');
+    if (flags.debug_form)  parts.push('<span class="cmd-flag">--debug-form</span>');
+    if (limit)             parts.push(`<span class="cmd-flag">--limit</span> <span class="cmd-val">${limit}</span>`);
+    if (user)              parts.push(`<span class="cmd-flag">--user</span> <span class="cmd-val">${user}</span>`);
+    parts.push(`<span class="cmd-flag">--timeframe</span> <span class="cmd-val">"${timeframe}"</span>`);
+
+    document.getElementById('cmd-preview').innerHTML = parts.join(' ');
+  }
+
+  function classifyLine(line) {
+    const l = line.toLowerCase();
+    if (l.includes('error') || l.includes('❌') || l.includes('failed') || l.includes('exception')) return 'error';
+    if (l.includes('✅') || l.includes('success') || l.includes('applied') || l.includes('submitted')) return 'success';
+    if (l.includes('⚠') || l.includes('warn') || l.includes('skip')) return 'warn';
+    if (l.includes('→') || l.includes('🔍') || l.includes('scraping') || l.includes('checking')) return 'info';
+    return 'default';
+  }
+
+  function appendLog(text) {
+    const out = document.getElementById('log-output');
+    // Remove cursor from last line if present
+    const cursor = out.querySelector('.log-cursor');
+    if (cursor) cursor.remove();
+
+    const lines = text.split('\n').filter(l => l.trim());
+    lines.forEach(line => {
+      const span = document.createElement('span');
+      span.className = `log-line ${classifyLine(line)}`;
+      span.textContent = line;
+      out.appendChild(span);
+      out.appendChild(document.createTextNode('\n'));
+    });
+
+    // Re-add cursor
+    const cur = document.createElement('span');
+    cur.className = 'log-cursor';
+    out.appendChild(cur);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function copyLog() {
+    const text = document.getElementById('log-output').innerText;
+    navigator.clipboard.writeText(text).then(() => {
+      appendLog('— log copied to clipboard —');
+    });
+  }
+
+  function clearLog() {
+    const out = document.getElementById('log-output');
+    out.innerHTML = '<span class="log-line muted">$ log cleared<span class="log-cursor"></span></span>';
+  }
+
+  function setRunning(running) {
+    isRunning = running;
+    const pill   = document.getElementById('status-pill');
+    const text   = document.getElementById('status-text');
+    const btnRun = document.getElementById('btn-run');
+    const btnStop= document.getElementById('btn-stop');
+
+    pill.classList.toggle('running', running);
+    text.textContent = running ? 'RUNNING' : 'IDLE';
+    btnRun.disabled  = running;
+    btnStop.disabled = !running;
+  }
+
+  function runScraper() {
+    const payload = {
+      ...flags,
+      limit:     document.getElementById('input-limit').value || null,
+      user:      document.getElementById('input-user').value || 'abraham',
+      timeframe: buildTimeframeRegex(),
+    };
+
+    if (payload.limit) payload.limit = parseInt(payload.limit);
+
+    fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) { appendLog(`ERROR: ${data.error}`); return; }
+      setRunning(true);
+      clearLog();
+      appendLog(`$ ${document.getElementById('cmd-preview').innerText}`);
+      appendLog(`[PID ${data.pid}] Scraper started...`);
+      startSSE();
+    })
+    .catch(e => appendLog(`ERROR: ${e}`));
+  }
+
+  function stopScraper() {
+    fetch('/stop', { method: 'POST' })
+      .then(r => r.json())
+      .then(() => { setRunning(false); if (eventSource) { eventSource.close(); eventSource = null; } });
+  }
+
+  function startSSE() {
+    if (eventSource) { eventSource.close(); }
+    eventSource = new EventSource('/logs');
+    eventSource.onmessage = (e) => {
+      if (e.data === '__DONE__') {
+        setRunning(false);
+        appendLog('— scraper finished —');
+        eventSource.close();
+        eventSource = null;
+      } else if (e.data !== '__PING__') {
+        appendLog(e.data);
+      }
+    };
+    eventSource.onerror = () => {
+      setRunning(false);
+      eventSource.close();
+      eventSource = null;
+    };
+  }
+
+  // Poll status on load (in case server restarted mid-run)
+  fetch('/status').then(r => r.json()).then(d => { if (d.running) { setRunning(true); startSSE(); } });
+
+  // Input listeners for live preview
+  ['input-limit','input-user'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updatePreview);
+  });
+
+  updatePreview();
+</script>
+</body>
+</html>

@@ -105,7 +105,8 @@ def generate_resume(job_id, title, raw_html):
     env["PATH"] = os.path.join(JSONCV_DIR, "node_modules/.bin") + ":" + env.get("PATH", "")
     subprocess.run(
         ["node", os.path.join(JSONCV_DIR, "node_modules/vite/bin/vite.js"), "build"],
-        cwd=JSONCV_DIR, env=env, check=True
+        cwd=JSONCV_DIR, env=env, check=True,
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
     )
     print("  Resume HTML built.")
 
@@ -133,7 +134,7 @@ def generate_resume(job_id, title, raw_html):
         "--no-pdf-header-footer",
         f"--print-to-pdf={pdf_path}",
         f"http://localhost:{port}/index.html"
-    ], check=True)
+    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     server.shutdown()
     os.chdir(orig_dir)
@@ -396,9 +397,10 @@ def scrape_jobs(driver):
 
             # Check timeframe
             try:
-                time_badge = card.find_element(
+                time_el = card.find_element(
                     By.CSS_SELECTOR, "[data-automation='jobListingDate']"
-                ).text.strip()
+                )
+                time_badge = (time_el.get_attribute("textContent") or "").split("•")[0].strip()
                 if not TIMEFRAME.match(time_badge):
                     skipped_old += 1
                     print(f"⏰ Too old ({time_badge}) | skipping")
@@ -481,6 +483,9 @@ def scrape_jobs(driver):
 driver = init_driver()
 try:
     scrape_jobs(driver)
-    input("\nDone. Press Enter to quit...")
+    try:
+        input("\nDone. Press Enter to quit...")
+    except EOFError:
+        pass
 finally:
     driver.quit()
