@@ -18,6 +18,7 @@ A Selenium port of [AutoApply](https://github.com/AbrahamPaulJ/AutoApply), rebui
 - Answers recruiter questions dynamically via Gemini
 - Submits the application automatically
 - Sends Telegram notifications for suitability results and successful applications
+- Flask web UI for browser-based control with live log streaming
 
 ---
 
@@ -30,6 +31,7 @@ A Selenium port of [AutoApply](https://github.com/AbrahamPaulJ/AutoApply), rebui
 - **jsoncv** — resume HTML builder (Vite-based)
 - **Chromium** — headless PDF generation
 - **Gemini API** — suitability, resume tailoring, cover letter, Q&A
+- **Flask** — web UI with SSE log streaming
 - **Telegram Bot API** — real-time notifications
 
 ---
@@ -53,7 +55,7 @@ pkg update && pkg upgrade -y
 pkg install python git openssh -y
 pkg install x11-repo -y
 pkg install firefox geckodriver chromium termux-x11-nightly -y
-pip install selenium pyyaml
+pip install selenium pyyaml flask
 ```
 
 ### 2. Clone repo
@@ -108,7 +110,16 @@ termux-x11 :0 &
 export DISPLAY=:0
 ```
 
-### Run scraper
+### Run via web UI (recommended)
+
+```bash
+cd AutoApply-Termux
+./run.sh
+```
+
+Then open `http://localhost:5000` in your browser. The UI lets you toggle flags, set limits, pick a timeframe, and watch live logs.
+
+### Run scraper directly
 
 ```bash
 cd AutoApply-Termux
@@ -123,7 +134,7 @@ python mvp_scraper.py --force-apply --limit 1 --clear-ids
 python mvp_scraper.py --no-gemini --force-apply --limit 1 --clear-ids
 
 # Real timeframe filter (jobs posted in last few hours only)
-python mvp_scraper.py --submit --timeframe "^\d+[mh]$"
+python mvp_scraper.py --submit --timeframe "^\d+[mh] ago$"
 
 # Debug recruiter questions
 python mvp_scraper.py --force-apply --limit 1 --clear-ids --debug-form
@@ -136,7 +147,7 @@ pkg install termux-api
 termux-wake-lock
 
 while true; do
-    python mvp_scraper.py --submit --timeframe "^\d+[mh]$"
+    python mvp_scraper.py --submit --timeframe "^\d+[mh] ago$"
     sleep 1800
 done
 ```
@@ -176,6 +187,9 @@ resume_prompt: |
 ```
 AutoApply-Termux/
 ├── mvp_scraper.py          # Main scraper and apply logic
+├── app.py                  # Flask web UI server
+├── templates/index.html    # Web UI (flag toggles, sliders, live logs)
+├── run.sh                  # Launcher — runs app.py by default
 ├── gemini.py               # Gemini API calls (gitignored — add your own)
 ├── utils.py                # Helper functions
 ├── seek_login.py           # One-time login session saver
